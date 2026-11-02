@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TNL 二級美睫師 模擬考</title>
+<style>
+  :root { --main:#c2185b; --bg:#fdf6f9; --card:#fff; --ok:#2e7d32; --bad:#c62828; --text:#333; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+  header { background:var(--main); color:#fff; padding:14px 16px; position:sticky; top:0; z-index:10; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+  header h1 { font-size:18px; margin:0; }
+  #timer { font-size:20px; font-weight:bold; font-variant-numeric:tabular-nums; }
+  .wrap { max-width:720px; margin:0 auto; padding:16px; }
+  .card { background:var(--card); border-radius:12px; padding:18px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  .btn { background:var(--main); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:16px; cursor:pointer; }
+  .btn:disabled { background:#bbb; cursor:not-allowed; }
+  .btn.ghost { background:#fff; color:var(--main); border:2px solid var(--main); }
+  .opt { display:block; width:100%; text-align:left; background:#fff; border:2px solid #e0c4d2; border-radius:10px; padding:10px 14px; margin:8px 0; font-size:16px; cursor:pointer; color:var(--text); }
+  .opt:hover { border-color:var(--main); }
+  .opt.sel { border-color:var(--main); background:#fce4ec; font-weight:bold; }
+  .opt.right { border-color:var(--ok); background:#e8f5e9; }
+  .opt.wrong { border-color:var(--bad); background:#ffebee; }
+  .qno { color:var(--main); font-weight:bold; }
+  .stat { display:flex; justify-content:space-between; font-size:14px; color:#666; margin-bottom:8px; flex-wrap:wrap; gap:6px; }
+  .nav { display:flex; justify-content:space-between; gap:10px; margin-top:12px; }
+  .big { font-size:48px; font-weight:bold; text-align:center; color:var(--main); }
+  .center { text-align:center; }
+  .pass { color:var(--ok); } .fail { color:var(--bad); }
+  .review-item { border-bottom:1px solid #eee; padding:10px 0; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>TNL 二級美睫師 模擬考</h1>
+  <div id="timer">15:00</div>
+</header>
+
+<div class="wrap">
+  <!-- 開始畫面 -->
+  <section id="start" class="card center">
+    <h2>模擬考說明</h2>
+    <p>隨機抽出 <b>20 題</b>，限時 <b>15 分鐘</b>。</p>
+    <p>答對每題 <b>+5 分</b>，答錯不扣分，未作答也不加分。<br>滿分 100 分，<b>60 分及格</b>。</p>
+    <p style="color:#777;font-size:14px">作答中可以上一題、下一題來回切換，交卷後可檢視每題對錯。</p>
+    <button class="btn" onclick="startExam()">開始考試</button>
+  </section>
+
+  <!-- 作答畫面 -->
+  <section id="exam" class="hidden">
+    <div class="stat">
+      <span id="progress"></span>
+      <span id="answeredCount"></span>
+    </div>
+    <div class="card">
+      <div id="qArea"></div>
+    </div>
+    <div class="nav">
+      <button class="btn ghost" id="prevBtn" onclick="go(-1)">上一題</button>
+      <button class="btn" id="nextBtn" onclick="go(1)">下一題</button>
+    </div>
+    <div class="center" style="margin-top:20px">
+      <button class="btn" style="background:#6a1b9a" onclick="confirmSubmit()">交卷</button>
+    </div>
+  </section>
+
+  <!-- 結果畫面 -->
+  <section id="result" class="hidden">
+    <div class="card center">
+      <div class="big" id="scoreBig"></div>
+      <p id="resultMsg" style="font-size:20px;font-weight:bold"></p>
+      <p id="resultDetail"></p>
+      <button class="btn" onclick="location.reload()">重新測驗</button>
+    </div>
+    <div class="card">
+      <h3>作答檢視</h3>
+      <div id="reviewArea"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+// 題庫：q 題目，o 選項，a 正確答案（1~4）
+const BANK = [
+{q:"稼接睫毛後，若客人感到不舒服，應該如何處理？",o:["為了美觀，請客人忍耐","盡速安排時間，幫助客人將不舒服的睫毛卸除下來","請客人自己卸除睫毛","請客人先點眼藥水"],a:2},
+{q:"稼接睫毛後可以刷睫毛膏嗎？",o:["可以，請使用植毛後專用睫毛膏","不可以","所有的睫毛膏皆可用","以上皆非"],a:1},
+{q:"稼接睫毛的長度，一般選擇比顧客本身睫毛的多少比例為宜？",o:["1倍","1.2～1.5倍","1.5～2倍","2.1～2.5倍"],a:2},
+{q:"稼接睫毛室內最理想的濕度為？",o:["40~70%","25~10%","10~40%","以上皆非"],a:1},
+{q:"稼接睫毛時，應將假睫毛黏貼於真睫毛為何處？",o:["毛根","皮膚","毛幹","毛尾"],a:3},
+{q:"正確的稼接手法，接睫毛的位置距離眼瞼皮膚多少為佳？",o:["1.0～1.5mm","1.5～2.0mm","2.0～2.5mm","0.5～1.0mm"],a:1},
+{q:"睫毛稼接完後脫落的速度與下列何者有關？",o:["睫毛生長週期","生活習慣","真睫毛本身條件","以上皆是"],a:4},
+{q:"因黑膠成本較高，存放不易，容易變質，故須保持室溫幾度適當？",o:["35～38度","22～28度","30～32度","32～34度"],a:2},
+{q:"稼接睫毛後為什麼需避免使用含油成份的卸妝產品？",o:["油性卸妝產品會溶解假睫毛","油性卸妝產品會破壞稼接專用黑膠","不影響無需避免可以使用油性卸妝產品","油性卸妝產品會使真睫毛脫落"],a:2},
+{q:"稼接睫毛後應避免使用何種化妝品？",o:["眼線膠筆","接睫專用眼唇卸妝液","睫毛雨","睫毛生長激素"],a:1},
+{q:"稼接睫毛過程中下列何者為第一優先？",o:["以夾子夾取睫毛","梳順吹乾睫毛","消毒雙手及器具","清潔客戶睫毛"],a:3},
+{q:"稼接睫毛後建議客人最佳回補時間？",o:["1週內","2~3週","4~6週","掉光再補"],a:2},
+{q:"替客人稼接睫毛後，當客人感到眼睛微薰，應作以下何種處理？",o:["請客人去洗臉","吹風","梳順睫毛","不用理會"],a:2},
+{q:"稼接睫毛前的眼形設計需與客戶溝通？",o:["捲度","粗度","長度","以上皆是"],a:4},
+{q:"強調根根分明才是健康的稼接睫毛方式何者為正確？",o:["每根睫毛生長週期不同，根根分明的稼接手法才不會造成睫毛斷裂及影響生長","只是因為流行","網路流傳的接法","以上皆是"],a:1},
+{q:"下列何者問題易引起眼皮發癢、發紅、腫脹？",o:["黑膠沾到皮膚","使用劣質黑膠","假睫毛接點碰到皮膚","以上皆是"],a:4},
+{q:"稼接睫毛後避免去三溫暖、蒸氣等，是因為黑膠遇到幾度以上即會開始融解？",o:["29度","30度","40度","38度"],a:3},
+{q:"一個專業的美睫師，會如何設計睫毛效果？",o:["判斷眼型","建議假睫毛材料","塑造睫型","以上皆是"],a:4},
+{q:"剛雷射完近視的客戶需多久時間才可以稼接？",o:["1個月","2個月","6個月","12個月以上"],a:3},
+{q:"什麼狀況的睫毛會掉比較快？",o:["自然捲","細軟毛","雜亂的睫毛","以上皆是"],a:4},
+{q:"稼接睫毛時應盡量選擇植接於？",o:["生長期","休止期","退化期","脫落期"],a:1},
+{q:"以下何種情形會導致所稼接的睫毛快速掉落？",o:["臉部容易出油","睫毛接點少者","使用油性卸妝品卸妝","以上皆是"],a:4},
+{q:"正常毛髮中水份含量約佔？",o:["4%","10%","15%","20%"],a:2},
+{q:"稼接睫毛後保養注意事項下列何者有誤？",o:["稼接睫毛後2-4小時內禁止碰水","稼接睫毛後不可以洗臉","稼接睫毛後，避免使用熱水洗臉","接完睫毛後，盡量減少直接搓揉眼睛"],a:2},
+{q:"哪種化學纖維睫毛粗度可以使用接在真睫毛上？",o:["0.07mm","0.10mm","0.15mm","以上皆可"],a:4},
+{q:"卸除睫毛時適合使用哪種卸除劑較佳？",o:["卸妝液","卸除露","去光水","卸甲液"],a:2},
+{q:"下列何者正確？",o:["為了降低成本客人使用的眼膜可以重複使用","接睫毛時可以讓客人熟睡","黑膠過了保存期限還是可以使用","接睫毛的第一個步驟是消毒雙手"],a:4},
+{q:"請問以下哪個季節，稼接睫毛維持的時間會較短？",o:["春天","夏天","秋天","冬天"],a:2},
+{q:"以下何者為手部消毒的正確流程？",o:["手心－手背－指縫－指尖","手背－指尖－手心－指縫","指尖－指縫－手心－手背","指縫－手心－指尖－手背"],a:1},
+{q:"有關紫外線消毒下列何者正確？",o:["光度強度每平方公分85微瓦特","照射時間至少要25分鐘以上","光度強度每平方公分80微瓦特","照射時間至少要15分鐘以上"],a:1},
+{q:"化妝品有異狀時應？",o:["降價出售","趕快用完","立刻停用","立即贈品"],a:3},
+{q:"依化妝品衛生管理條例之規定，化妝品可分為？",o:["男用女用","美容用與美髮用","一般化妝品與含藥化妝品","乾性與油性"],a:3},
+{q:"化妝品外包裝未依規定標示成份、名稱等，得以處罰？",o:["無任何罰責","5萬元以下","10萬元以下","15萬元以下"],a:3},
+{q:"美容院自製化妝品給顧客使用處罰？",o:["5萬元","10萬元","15萬元","20萬元罰鍰"],a:3},
+{q:"美容院販賣樣品處罰？",o:["五萬元","十萬元","二十萬元","不必罰款"],a:2},
+{q:"美容院停業多久以內需報主管機關？",o:["6天","15天","30天","120天"],a:3},
+{q:"化妝師私自調配化妝品，違反化妝品衛生管理條例，會被處？",o:["十萬元以下罰鍰","一萬元以下罰鍰","一年以下有期徒刑","五年以上有期徒刑"],a:3},
+{q:"美容從業人員應該努力的目標，不包括？",o:["進修專業的知識和技術","學習優雅的專業談吐","詢問顧客的隱私","關心社會及流行的趨勢"],a:3},
+{q:"說服顧客購買產品時最好的方式是？",o:["批評產品品質","親切服務，詳細解說","誇大商品功效","強迫推銷"],a:2},
+{q:"美容從業人員忌諱的行為是？",o:["傾聽顧客的傾訴","批評別人的手藝","適度讚美顧客的服飾","積極進取，充滿自信"],a:2},
+{q:"顧客有抱怨及牢騷時，應以何種態度來處理？",o:["不屑的態度","無禮的態度","誠懇的態度","不理不睬的態度"],a:3},
+{q:"美睫師具有正確姿態有助於防止？",o:["肌肉緊張","身體疲勞","痠痛","以上皆是"],a:4},
+{q:"當您有事需要順延預約時間時，應對顧客如何處理？",o:["給顧客打折","不管他","讓顧客回家","告知顧客此情況"],a:4},
+{q:"美睫從業人員與顧客交談的話題應該配合？",o:["顧客的隱私","宗教","顧客的心情","政治"],a:3},
+{q:"美睫從業人員的證書、執照等應？",o:["收藏於保險箱裡","放在家中","陳列於店內明顯處","放置在辦公桌抽屜內"],a:3},
+{q:"美睫從業人員分析自我品格是為了？",o:["自我改進","聰明表現","排遣時間","良好習慣"],a:1},
+{q:"美睫店的服務品質評價來至於？",o:["老闆","同事","消費者","自己"],a:3},
+{q:"店內的顧客資料卡應放置於？",o:["老闆抽屜","櫃檯","廁所","產品架上"],a:2},
+{q:"提供服務之前與顧客間的談話稱為？",o:["閒聊","諮詢","推銷","介紹"],a:2},
+{q:"有關睫毛的居家保養，顧客會徵求誰的意見？",o:["美睫師","美甲師","化妝師","美髮師"],a:1},
+{q:"下列那項屬於稼接睫毛工作前準備？",o:["眼部清潔","下睫毛保護","選取要接睫毛的尺寸","以上皆是"],a:4},
+{q:"毛髮本身所帶的電荷為？",o:["陽離子","陰離子","正負都有","正負都沒"],a:2},
+{q:"毛髮的成份蛋白質佔頭髮的百分比？",o:["57%","67%","97%","17%"],a:3},
+{q:"毛髮藉著分泌下列何物得以保持柔順？",o:["赫爾蒙","皮脂","角質素","酵素"],a:2},
+{q:"毛髮成長不受那一項影響？",o:["季節","味覺","荷爾蒙","健康"],a:2},
+{q:"一般頭髮生命週期為？",o:["2～6月","2～6年","8～10月","8～10年"],a:2},
+{q:"如果毛乳頭被破壞了，毛髮將會？",o:["再生長","生長快速","生長緩慢","不再生長"],a:4},
+{q:"毛髮完全脫離毛乳頭是屬於？",o:["生長期","活躍期","退化期","休止期"],a:4},
+{q:"毛髮的退化期約？",o:["1～2週","2～4週","6～8週","8～10週"],a:1},
+{q:"下列何者有抑制頭髮生長的作用？",o:["女性荷爾蒙","維生素C","男性荷爾蒙","酸性潤髮劑"],a:3},
+{q:"退化期的頭髮約佔頭髮總量的？",o:["1%","5%","10%","20%"],a:1},
+{q:"毛髮正常的毛球為？",o:["長了不再掉","掉了不再長","只長不會掉","掉了再長"],a:4},
+{q:"有利於毛髮的營養素？",o:["醣類","碳水化合物","蛋白質食物","澱粉"],a:3},
+{q:"有「毛髮之母」之稱的是？",o:["毛頭","毛根","毛幹","毛乳頭"],a:4},
+{q:"淡色的毛髮含有較少的？",o:["氧","硫","鋅","碳"],a:4},
+{q:"毛髮的結構下列何者正確？",o:["毛髮分毛囊和毛根兩部分","毛幹埋在皮膚內，其末梢端有毛乳頭及毛囊環繞","血液則負責供應毛囊細胞養分","以上皆非"],a:3},
+{q:"毛髮是嬰兒在母親腹中？",o:["3個月","6個月","10個月","出生時即開始生長"],a:1},
+{q:"一般毛髮的直徑在？",o:["60毫米以下","60～90毫米","90～120毫米","120毫米以上"],a:2},
+{q:"身上沒有皮脂腺的地方是？",o:["手掌","眼皮","鼻翼","臉頰"],a:1},
+{q:"毛髮的角質蛋白含有？",o:["硫","鐵","銅","鋅"],a:1},
+{q:"毛髮露出表皮可見的部份稱為？",o:["毛根","毛幹","毛髁","毛囊"],a:2},
+{q:"毛髮的表皮層是一種？",o:["透明狀","半透明狀","不透明狀","黑色狀"],a:2},
+{q:"當色素消失而形成了空間，毛髮變成為？",o:["黑色","棕色","紅色","灰白色"],a:4},
+{q:"使用酒精消毒時，機具完全浸泡至少需多少時間以上？",o:["十分鐘","十五分鐘","二十分鐘","二十五分鐘"],a:1},
+{q:"消毒過後的美睫工具應放在？",o:["工具台上","乾式消毒器內","無蓋的容器裡","抽屜裡"],a:2},
+{q:"對美睫店的環境要求是？",o:["無菌的","傳染性的","清潔衛生的","裝飾性的"],a:3},
+{q:"毛巾適用的消毒方法為？",o:["蒸氣消毒法","酒精消毒法","氯液消毒法","紫外線消毒法"],a:1},
+{q:"毛巾放置蒸氣箱摺成弓字直立置入用意為何？",o:["收取方便","老闆規定","蒸氣可完全進入毛巾","比較美觀"],a:3},
+{q:"為了確保消毒劑的效力，購買時應注意？",o:["少量購買","郵寄購買","批量購買","天氣好的時候購買"],a:1}
+];
+
+const EXAM_COUNT = 20;
+const TIME_LIMIT = 15 * 60;
+const PER_RIGHT = 5, PER_WRONG = 0, PASS = 60;
+
+let questions = [], answers = [], cur = 0, timeLeft = TIME_LIMIT, timerId = null, finished = false;
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startExam() {
+  const picked = shuffle(BANK).slice(0, EXAM_COUNT).map(item => {
+    // 打亂選項順序，並記住新的正確答案位置
+    const idxs = shuffle([0,1,2,3]);
+    const opts = idxs.map(i => item.o[i]);
+    const correct = idxs.indexOf(item.a - 1) + 1;
+    return { q: item.q, o: opts, a: correct };
+  });
+  questions = picked;
+  answers = new Array(EXAM_COUNT).fill(null);
+  cur = 0;
+  timeLeft = TIME_LIMIT;
+  finished = false;
+  document.getElementById('start').classList.add('hidden');
+  document.getElementById('result').classList.add('hidden');
+  document.getElementById('exam').classList.remove('hidden');
+  render();
+  updateTimer();
+  timerId = setInterval(() => {
+    timeLeft--;
+    updateTimer();
+    if (timeLeft <= 0) {
+      clearInterval(timerId);
+      alert('時間到，自動交卷！');
+      submitExam();
+    }
+  }, 1000);
+}
+
+function updateTimer() {
+  const m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+  const el = document.getElementById('timer');
+  el.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  el.style.color = timeLeft <= 60 ? '#ffeb3b' : '#fff';
+}
+
+function render() {
+  const q = questions[cur];
+  document.getElementById('progress').textContent = `第 ${cur+1} / ${EXAM_COUNT} 題`;
+  const answered = answers.filter(x => x !== null).length;
+  document.getElementById('answeredCount').textContent = `已作答 ${answered} 題`;
+  let html = `<div class="qno">第 ${cur+1} 題</div><p style="font-size:17px">${q.q}</p>`;
+  q.o.forEach((opt, i) => {
+    const sel = answers[cur] === i+1 ? ' sel' : '';
+    html += `<button class="opt${sel}" onclick="choose(${i+1})">(${i+1}) ${opt}</button>`;
+  });
+  document.getElementById('qArea').innerHTML = html;
+  document.getElementById('prevBtn').disabled = cur === 0;
+  document.getElementById('nextBtn').disabled = cur === EXAM_COUNT - 1;
+}
+
+function choose(n) {
+  answers[cur] = n;
+  render();
+}
+
+function go(d) {
+  cur = Math.min(EXAM_COUNT-1, Math.max(0, cur + d));
+  render();
+}
+
+function confirmSubmit() {
+  const unanswered = answers.filter(x => x === null).length;
+  let msg = '確定交卷？';
+  if (unanswered > 0) msg = `還有 ${unanswered} 題未作答（未作答不加分），確定交卷？`;
+  if (confirm(msg)) submitExam();
+}
+
+function submitExam() {
+  if (finished) return;
+  finished = true;
+  clearInterval(timerId);
+  let right = 0, wrong = 0;
+  questions.forEach((q, i) => {
+    if (answers[i] === null) return;
+    if (answers[i] === q.a) right++; else wrong++;
+  });
+  let score = right * PER_RIGHT + wrong * PER_WRONG;
+  if (score < 0) score = 0;
+  if (score > 100) score = 100;
+  const unanswered = EXAM_COUNT - right - wrong;
+
+  document.getElementById('exam').classList.add('hidden');
+  document.getElementById('result').classList.remove('hidden');
+  document.getElementById('scoreBig').textContent = score + ' 分';
+  const passed = score >= PASS;
+  const msgEl = document.getElementById('resultMsg');
+  msgEl.textContent = passed ? '恭喜，及格！' : '未及格，請再複習';
+  msgEl.className = passed ? 'pass' : 'fail';
+  document.getElementById('resultDetail').textContent =
+    `答對 ${right} 題、答錯 ${wrong} 題、未作答 ${unanswered} 題（使用時間 ${formatUsed()}）`;
+
+  let rev = '';
+  questions.forEach((q, i) => {
+    const my = answers[i];
+    const status = my === null ? '未作答' : (my === q.a ? '✔ 答對' : '✘ 答錯');
+    const color = my === null ? '#777' : (my === q.a ? 'var(--ok)' : 'var(--bad)');
+    rev += `<div class="review-item"><div><span class="qno">第 ${i+1} 題</span> <span style="color:${color};font-weight:bold">${status}</span></div>`;
+    rev += `<div>${q.q}</div>`;
+    if (my !== null && my !== q.a) rev += `<div style="color:var(--bad)">你的答案：(${my}) ${q.o[my-1]}</div>`;
+    rev += `<div style="color:var(--ok)">正確答案：(${q.a}) ${q.o[q.a-1]}</div></div>`;
+  });
+  document.getElementById('reviewArea').innerHTML = rev;
+  window.scrollTo(0,0);
+}
+
+function formatUsed() {
+  const used = TIME_LIMIT - timeLeft;
+  return Math.floor(used/60) + ' 分 ' + (used%60) + ' 秒';
+}
+</script>
+</body>
+</html>
